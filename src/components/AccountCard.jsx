@@ -1,5 +1,5 @@
 import React from 'react';
-import { Banknote, Building2, Smartphone } from 'lucide-react';
+import { Banknote, Building2, Smartphone, Pencil, Trash2 } from 'lucide-react';
 import { formatCurrency } from '../lib/api';
 
 const typeIcons = {
@@ -14,7 +14,7 @@ const typeLabels = {
   ewallet: 'E-Wallet',
 };
 
-export default function AccountCard({ account }) {
+export default function AccountCard({ account, onEdit, onDelete }) {
   const Icon = typeIcons[account.type] || Banknote;
 
   return (
@@ -29,6 +29,30 @@ export default function AccountCard({ account }) {
       <div className="account-card__balance">
         {formatCurrency(account.balance)}
       </div>
+      {(onEdit || onDelete) && (
+        <div className="account-card__actions">
+          {onEdit && (
+            <button
+              className="account-card__action-btn"
+              onClick={() => onEdit(account)}
+              aria-label={`Edit ${account.name}`}
+              id={`edit-account-${account.id}`}
+            >
+              <Pencil size={15} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              className="account-card__action-btn account-card__action-btn--delete"
+              onClick={() => onDelete(account)}
+              aria-label={`Hapus ${account.name}`}
+              id={`delete-account-${account.id}`}
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

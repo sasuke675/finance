@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, FileText, Banknote, Building2, Smartphone } from 'lucide-react';
+import { Plus, FileText, Banknote, Building2, Smartphone, AlertTriangle } from 'lucide-react';
 import { useAccounts } from '../hooks/useAccounts';
 import { formatCurrency } from '../lib/api';
 import AccountCard from '../components/AccountCard';
@@ -17,12 +17,24 @@ export default function DashboardView() {
   const [showTxModal, setShowTxModal] = useState(false);
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showEditAccountModal, setShowEditAccountModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [txLoading, setTxLoading] = useState(false);
 
   // New account form state
   const [newAccountName, setNewAccountName] = useState('');
   const [newAccountType, setNewAccountType] = useState('cash');
   const [newAccountBalance, setNewAccountBalance] = useState('');
+
+  // Edit account state
+  const [editingAccount, setEditingAccount] = useState(null);
+  const [editAccountName, setEditAccountName] = useState('');
+  const [editAccountType, setEditAccountType] = useState('cash');
+  const [editAccountBalance, setEditAccountBalance] = useState('');
+
+  // Delete account state
+  const [deletingAccount, setDeletingAccount] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Debt form state
   const [debtCustomer, setDebtCustomer] = useState('');
@@ -61,6 +73,53 @@ export default function DashboardView() {
     } catch (err) {
       console.error(err);
       alert('Gagal menambah akun: ' + err.message);
+    }
+  };
+
+  const handleEditAccount = (account) => {
+    setEditingAccount(account);
+    setEditAccountName(account.name);
+    setEditAccountType(account.type);
+    setEditAccountBalance(String(account.balance));
+    setShowEditAccountModal(true);
+  };
+
+  const handleSaveEditAccount = async (e) => {
+    e.preventDefault();
+    const { updateAccount } = await import('../lib/api');
+    try {
+      await updateAccount(editingAccount.id, {
+        name: editAccountName,
+        type: editAccountType,
+        balance: parseFloat(editAccountBalance) || 0,
+      });
+      setShowEditAccountModal(false);
+      setEditingAccount(null);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      alert('Gagal mengubah akun: ' + err.message);
+    }
+  };
+
+  const handleDeleteAccount = (account) => {
+    setDeletingAccount(account);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    const { deleteAccount } = await import('../lib/api');
+    setDeleteLoading(true);
+    try {
+      await deleteAccount(deletingAccount.id);
+      setShowDeleteConfirm(false);
+      setDeletingAccount(null);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menghapus akun: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -119,7 +178,12 @@ export default function DashboardView() {
             </div>
             <div className="account-group__list">
               {group.map((account) => (
-                <AccountCard key={account.id} account={account} />
+                <AccountCard
+                  key={account.id}
+                  account={account}
+                  onEdit={handleEditAccount}
+                  onDelete={handleDeleteAccount}
+                />
               ))}
             </div>
           </div>
@@ -304,6 +368,107 @@ export default function DashboardView() {
             Tambah Akun
           </button>
         </form>
+      </Modal>
+
+      {/* Edit Account Modal */}
+      <Modal
+        isOpen={showEditAccountModal}
+        onClose={() => { setShowEditAccountModal(false); setEditingAccount(null); }}
+        title="Edit Akun"
+      >
+        <form onSubmit={handleSaveEditAccount} id="edit-account-form">
+          <div className="form-group mb-base">
+            <label className="form-label" htmlFor="edit-acc-name">Nama Akun</label>
+            <input
+              id="edit-acc-name"
+              type="text"
+              className="form-input"
+              value={editAccountName}
+              onChange={(e) => setEditAccountName(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div className="form-group mb-base">
+            <label className="form-label" htmlFor="edit-acc-type">Tipe Akun</label>
+            <select
+              id="edit-acc-type"
+              className="form-select"
+              value={editAccountType}
+              onChange={(e) => setEditAccountType(e.target.value)}
+              required
+            >
+              <option value="cash">Tunai (Cash)</option>
+              <option value="bank">Bank</option>
+              <option value="ewallet">E-Wallet</option>
+            </select>
+          </div>
+          <div className="form-group mb-base">
+            <label className="form-label" htmlFor="edit-acc-balance">Saldo (Rp)</label>
+            <input
+              id="edit-acc-balance"
+              type="number"
+              className="form-input"
+              value={editAccountBalance}
+              onChange={(e) => setEditAccountBalance(e.target.value)}
+              min="0"
+            />
+          </div>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn btn--secondary btn--full"
+              onClick={() => { setShowEditAccountModal(false); setEditingAccount(null); }}
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              className="btn btn--primary btn--full"
+              disabled={!editAccountName}
+              id="edit-acc-submit-btn"
+            >
+              Simpan Perubahan
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => { setShowDeleteConfirm(false); setDeletingAccount(null); }}
+        title="Hapus Akun"
+      >
+        {deletingAccount && (
+          <div className="confirm-delete">
+            <div className="confirm-delete__icon">
+              <AlertTriangle size={24} />
+            </div>
+            <div className="confirm-delete__text">
+              Yakin ingin menghapus akun{' '}
+              <span className="confirm-delete__name">{deletingAccount.name}</span>?
+              <br />
+              Semua transaksi terkait akun ini juga akan terhapus.
+            </div>
+            <div className="form-actions" style={{ width: '100%' }}>
+              <button
+                className="btn btn--secondary btn--full"
+                onClick={() => { setShowDeleteConfirm(false); setDeletingAccount(null); }}
+              >
+                Batal
+              </button>
+              <button
+                className="btn btn--danger btn--full"
+                onClick={handleConfirmDelete}
+                disabled={deleteLoading}
+                id="confirm-delete-btn"
+              >
+                {deleteLoading ? 'Menghapus...' : 'Ya, Hapus'}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

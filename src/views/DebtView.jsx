@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Pencil } from 'lucide-react';
 import { useDebts } from '../hooks/useDebts';
 import { useAccounts } from '../hooks/useAccounts';
 import { formatCurrency, formatShortDate } from '../lib/api';
@@ -34,12 +34,25 @@ export default function DebtView() {
   const [selectedDebt, setSelectedDebt] = useState(null);
   const [showPayModal, setShowPayModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddMoreModal, setShowAddMoreModal] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [addMoreLoading, setAddMoreLoading] = useState(false);
 
   // Add debt form state
   const [debtCustomer, setDebtCustomer] = useState('');
   const [debtAmount, setDebtAmount] = useState('');
+
+  // Edit debt form state
+  const [editingDebt, setEditingDebt] = useState(null);
+  const [editCustomer, setEditCustomer] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+
+  // Add more debt state (for existing customer)
+  const [addMoreDebt, setAddMoreDebt] = useState(null);
+  const [addMoreAmount, setAddMoreAmount] = useState('');
 
   const handlePay = async (paymentData) => {
     setPayLoading(true);
@@ -72,6 +85,60 @@ export default function DebtView() {
       alert('Gagal mencatat hutang: ' + err.message);
     } finally {
       setAddLoading(false);
+    }
+  };
+
+  const handleEditDebt = (debt) => {
+    setEditingDebt(debt);
+    setEditCustomer(debt.customer_name);
+    setEditAmount(String(debt.total_amount));
+    setShowEditModal(true);
+  };
+
+  const handleSaveEditDebt = async (e) => {
+    e.preventDefault();
+    const { updateDebt } = await import('../lib/api');
+    setEditLoading(true);
+    try {
+      await updateDebt(editingDebt.id, {
+        customerName: editCustomer,
+        totalAmount: parseFloat(editAmount),
+      });
+      setShowEditModal(false);
+      setEditingDebt(null);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      alert('Gagal mengubah hutang: ' + err.message);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleOpenAddMore = (debt) => {
+    setAddMoreDebt(debt);
+    setAddMoreAmount('');
+    setShowAddMoreModal(true);
+  };
+
+  const handleAddMoreDebt = async (e) => {
+    e.preventDefault();
+    const { updateDebt } = await import('../lib/api');
+    setAddMoreLoading(true);
+    try {
+      const newTotal = Number(addMoreDebt.total_amount) + parseFloat(addMoreAmount);
+      await updateDebt(addMoreDebt.id, {
+        totalAmount: newTotal,
+      });
+      setShowAddMoreModal(false);
+      setAddMoreDebt(null);
+      setAddMoreAmount('');
+      refresh();
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menambah hutang: ' + err.message);
+    } finally {
+      setAddMoreLoading(false);
     }
   };
 
@@ -145,9 +212,19 @@ export default function DebtView() {
               <div key={debt.id} className="debt-card animate-in" id={`debt-${debt.id}`}>
                 <div className="debt-card__header">
                   <div className="debt-card__name">{debt.customer_name}</div>
-                  <span className={`debt-card__status debt-card__status--${debt.status}`}>
-                    {statusLabels[debt.status]}
-                  </span>
+                  <div className="debt-card__header-actions">
+                    <button
+                      className="debt-card__edit-btn"
+                      onClick={() => handleEditDebt(debt)}
+                      aria-label={`Edit hutang ${debt.customer_name}`}
+                      id={`edit-debt-${debt.id}`}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <span className={`debt-card__status debt-card__status--${debt.status}`}>
+                      {statusLabels[debt.status]}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="debt-card__amounts">
@@ -168,15 +245,28 @@ export default function DebtView() {
                   <span className="text-muted" style={{ fontSize: 'var(--font-size-xs)' }}>
                     {formatShortDate(debt.created_at)}
                   </span>
-                  {debt.status !== 'paid' && (
-                    <button
-                      className="btn btn--pay"
-                      onClick={() => openPayModal(debt)}
-                      id={`pay-btn-${debt.id}`}
-                    >
-                      Bayar
-                    </button>
-                  )}
+                  <div className="flex items-center gap-sm">
+                    {debt.status !== 'paid' && (
+                      <>
+                        <button
+                          className="btn btn--secondary btn--sm"
+                          onClick={() => handleOpenAddMore(debt)}
+                          id={`add-more-debt-${debt.id}`}
+                          style={{ fontSize: 'var(--font-size-xs)', padding: '4px 10px' }}
+                        >
+                          <Plus size={13} />
+                          Tambah
+                        </button>
+                        <button
+                          className="btn btn--pay"
+                          onClick={() => openPayModal(debt)}
+                          id={`pay-btn-${debt.id}`}
+                        >
+                          Bayar
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -248,6 +338,127 @@ export default function DebtView() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Edit Debt Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => { setShowEditModal(false); setEditingDebt(null); }}
+        title="Edit Hutang"
+      >
+        {editingDebt && (
+          <form onSubmit={handleSaveEditDebt} id="edit-debt-form">
+            <div className="form-group mb-base">
+              <label className="form-label" htmlFor="edit-debt-customer">Nama Pelanggan</label>
+              <input
+                id="edit-debt-customer"
+                type="text"
+                className="form-input"
+                value={editCustomer}
+                onChange={(e) => setEditCustomer(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="form-group mb-base">
+              <label className="form-label" htmlFor="edit-debt-amount">Total Hutang (Rp)</label>
+              <input
+                id="edit-debt-amount"
+                type="number"
+                className="form-input"
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+                min="1"
+                required
+              />
+            </div>
+            {Number(editingDebt.paid_amount) > 0 && (
+              <div className="card card--glass mb-base" style={{ padding: 'var(--spacing-md)' }}>
+                <div className="text-muted" style={{ fontSize: 'var(--font-size-sm)' }}>
+                  Sudah dibayar: <span className="text-income font-bold">{formatCurrency(editingDebt.paid_amount)}</span>
+                </div>
+              </div>
+            )}
+            <div className="form-actions">
+              <button
+                type="button"
+                className="btn btn--secondary btn--full"
+                onClick={() => { setShowEditModal(false); setEditingDebt(null); }}
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="btn btn--primary btn--full"
+                disabled={editLoading || !editCustomer || !editAmount}
+                id="edit-debt-submit-btn"
+              >
+                {editLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Add More Debt Modal (add to existing customer) */}
+      <Modal
+        isOpen={showAddMoreModal}
+        onClose={() => { setShowAddMoreModal(false); setAddMoreDebt(null); }}
+        title="Tambah Hutang"
+      >
+        {addMoreDebt && (
+          <form onSubmit={handleAddMoreDebt} id="add-more-debt-form">
+            <div className="card card--glass mb-base" style={{ padding: 'var(--spacing-md)' }}>
+              <div className="flex justify-between items-center mb-sm">
+                <span className="text-muted" style={{ fontSize: 'var(--font-size-sm)' }}>Pelanggan</span>
+                <span className="font-bold">{addMoreDebt.customer_name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted" style={{ fontSize: 'var(--font-size-sm)' }}>Hutang Saat Ini</span>
+                <span className="text-expense font-bold">{formatCurrency(addMoreDebt.total_amount)}</span>
+              </div>
+            </div>
+            <div className="form-group mb-base">
+              <label className="form-label" htmlFor="add-more-amount">Tambahan Hutang (Rp)</label>
+              <input
+                id="add-more-amount"
+                type="number"
+                className="form-input"
+                placeholder="0"
+                value={addMoreAmount}
+                onChange={(e) => setAddMoreAmount(e.target.value)}
+                min="1"
+                required
+                autoFocus
+              />
+            </div>
+            {addMoreAmount && parseFloat(addMoreAmount) > 0 && (
+              <div className="card card--expense mb-base" style={{ padding: 'var(--spacing-md)', textAlign: 'center' }}>
+                <span className="text-muted" style={{ fontSize: 'var(--font-size-sm)' }}>Total hutang baru: </span>
+                <span className="text-expense font-bold">
+                  {formatCurrency(Number(addMoreDebt.total_amount) + parseFloat(addMoreAmount))}
+                </span>
+              </div>
+            )}
+            <div className="form-actions">
+              <button
+                type="button"
+                className="btn btn--secondary btn--full"
+                onClick={() => { setShowAddMoreModal(false); setAddMoreDebt(null); }}
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="btn btn--danger btn--full"
+                disabled={addMoreLoading || !addMoreAmount}
+                id="add-more-debt-submit-btn"
+              >
+                {addMoreLoading ? 'Menyimpan...' : 'Tambah Hutang'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

@@ -55,6 +55,32 @@ export async function createAccount({ name, type, balance = 0 }) {
   return data;
 }
 
+export async function updateAccount(id, { name, type, balance }) {
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (type !== undefined) updates.type = type;
+  if (balance !== undefined) updates.balance = balance;
+
+  const { data, error } = await supabase
+    .from('accounts')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteAccount(id) {
+  const { error } = await supabase
+    .from('accounts')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
 // =====================
 // TRANSACTIONS
 // =====================
@@ -125,6 +151,22 @@ export async function createDebt({ customerName, totalAmount }) {
       customer_name: customerName,
       total_amount: totalAmount,
     })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateDebt(id, { customerName, totalAmount }) {
+  const updates = {};
+  if (customerName !== undefined) updates.customer_name = customerName;
+  if (totalAmount !== undefined) updates.total_amount = totalAmount;
+
+  const { data, error } = await supabase
+    .from('debts')
+    .update(updates)
+    .eq('id', id)
     .select()
     .single();
 
