@@ -110,7 +110,7 @@ export async function fetchTransactions({ accountId, type, startDate, endDate, l
   return data || [];
 }
 
-export async function createTransaction({ accountId, type, amount, targetAccountId, description, category }) {
+export async function createTransaction({ accountId, type, amount, targetAccountId, description, category, adminFee, adminFeeAccountId }) {
   // Use RPC for atomic balance update
   const { data, error } = await supabase.rpc('create_transaction_with_balance', {
     p_account_id: accountId,
@@ -119,6 +119,8 @@ export async function createTransaction({ accountId, type, amount, targetAccount
     p_target_account_id: targetAccountId || null,
     p_description: description || '',
     p_category: category || '',
+    p_admin_fee: adminFee || 0,
+    p_admin_fee_account_id: adminFeeAccountId || null,
   });
 
   if (error) throw error;

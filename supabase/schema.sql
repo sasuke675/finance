@@ -106,7 +106,9 @@ CREATE OR REPLACE FUNCTION create_transaction_with_balance(
   p_amount NUMERIC,
   p_target_account_id UUID DEFAULT NULL,
   p_description TEXT DEFAULT '',
-  p_category TEXT DEFAULT ''
+  p_category TEXT DEFAULT '',
+  p_admin_fee NUMERIC DEFAULT 0,
+  p_admin_fee_account_id UUID DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -114,6 +116,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_transaction_id UUID;
+  v_fee_account_id UUID;
 BEGIN
   -- Insert the transaction record
   INSERT INTO transactions (account_id, type, amount, target_account_id, description, category)
@@ -130,6 +133,22 @@ BEGIN
     UPDATE accounts SET balance = balance - p_amount WHERE id = p_account_id;
     -- Increment target account
     UPDATE accounts SET balance = balance + p_amount WHERE id = p_target_account_id;
+  END IF;
+
+  -- Insert admin fee transaction if specified
+  IF p_admin_fee IS NOT NULL AND p_admin_fee > 0 THEN
+    v_fee_account_id := COALESCE(p_admin_fee_account_id, p_account_id);
+    
+    INSERT INTO transactions (account_id, type, amount, description, category)
+    VALUES (
+      v_fee_account_id,
+      'in',
+      p_admin_fee,
+      'Fee Admin: ' || COALESCE(NULLIF(p_description, ''), p_category, p_type::text),
+      'Fee/Biaya Admin'
+    );
+
+    UPDATE accounts SET balance = balance + p_admin_fee WHERE id = v_fee_account_id;
   END IF;
 
   RETURN v_transaction_id;

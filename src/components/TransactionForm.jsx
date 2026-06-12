@@ -11,6 +11,7 @@ const CATEGORIES = [
   'Pembelian Stok',
   'Operasional',
   'Pelunasan Hutang',
+  'Fee/Biaya Admin',
   'Lainnya',
 ];
 
@@ -21,6 +22,8 @@ export default function TransactionForm({ accounts, onSubmit, onCancel, loading 
   const [targetAccountId, setTargetAccountId] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [adminFee, setAdminFee] = useState('');
+  const [adminFeeAccountId, setAdminFeeAccountId] = useState(accounts[0]?.id || '');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,12 +37,15 @@ export default function TransactionForm({ accounts, onSubmit, onCancel, loading 
       targetAccountId: type === 'transfer' ? targetAccountId : null,
       description,
       category,
+      adminFee: adminFee ? parseFloat(adminFee) : 0,
+      adminFeeAccountId: adminFee && parseFloat(adminFee) > 0 ? adminFeeAccountId : null,
     });
 
     // Reset form
     setAmount('');
     setDescription('');
     setCategory('');
+    setAdminFee('');
   };
 
   return (
@@ -101,7 +107,13 @@ export default function TransactionForm({ accounts, onSubmit, onCancel, loading 
             id="tx-account"
             className="form-select"
             value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setAccountId(val);
+              if (!adminFeeAccountId || adminFeeAccountId === accountId) {
+                setAdminFeeAccountId(val);
+              }
+            }}
             required
           >
             <option value="">Pilih akun</option>
@@ -164,6 +176,41 @@ export default function TransactionForm({ accounts, onSubmit, onCancel, loading 
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
+
+      {/* Admin Fee (Pemasukan) */}
+      <div className="form-group mb-base">
+        <label className="form-label" htmlFor="tx-admin-fee">Fee / Biaya Admin (Pemasukan)</label>
+        <input
+          id="tx-admin-fee"
+          type="number"
+          className="form-input"
+          placeholder="0 (Opsional)"
+          value={adminFee}
+          onChange={(e) => setAdminFee(e.target.value)}
+          min="0"
+        />
+      </div>
+
+      {/* Admin Fee Account Selection */}
+      {adminFee && parseFloat(adminFee) > 0 && (
+        <div className="form-group mb-base animate-in">
+          <label className="form-label" htmlFor="tx-admin-fee-account">Akun Penerima Fee</label>
+          <select
+            id="tx-admin-fee-account"
+            className="form-select"
+            value={adminFeeAccountId}
+            onChange={(e) => setAdminFeeAccountId(e.target.value)}
+            required
+          >
+            <option value="">Pilih akun</option>
+            {accounts.map((acc) => (
+              <option key={acc.id} value={acc.id}>
+                {acc.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="form-actions">
