@@ -3,11 +3,6 @@ import { supabase } from './supabase';
 // =====================
 // HELPERS
 // =====================
-function getUserId() {
-  // For now, we use a fixed demo user ID.
-  // Replace with supabase.auth.getUser() when auth is implemented.
-  return 'demo-user-id';
-}
 
 export function formatCurrency(amount) {
   return new Intl.NumberFormat('id-ID', {
@@ -52,12 +47,7 @@ export async function fetchAccounts() {
 export async function createAccount({ name, type, balance = 0 }) {
   const { data, error } = await supabase
     .from('accounts')
-    .insert({
-      user_id: getUserId(),
-      name,
-      type,
-      balance,
-    })
+    .insert({ name, type, balance })
     .select()
     .single();
 
@@ -97,7 +87,6 @@ export async function fetchTransactions({ accountId, type, startDate, endDate, l
 export async function createTransaction({ accountId, type, amount, targetAccountId, description, category }) {
   // Use RPC for atomic balance update
   const { data, error } = await supabase.rpc('create_transaction_with_balance', {
-    p_user_id: getUserId(),
     p_account_id: accountId,
     p_type: type,
     p_amount: amount,
@@ -133,7 +122,6 @@ export async function createDebt({ customerName, totalAmount }) {
   const { data, error } = await supabase
     .from('debts')
     .insert({
-      user_id: getUserId(),
       customer_name: customerName,
       total_amount: totalAmount,
     })
@@ -147,7 +135,6 @@ export async function createDebt({ customerName, totalAmount }) {
 export async function payDebt({ debtId, amount, accountId }) {
   // Use RPC for atomic debt payment + balance update
   const { data, error } = await supabase.rpc('pay_debt_with_balance', {
-    p_user_id: getUserId(),
     p_debt_id: debtId,
     p_amount: amount,
     p_account_id: accountId,
@@ -163,7 +150,6 @@ export async function payDebt({ debtId, amount, accountId }) {
 
 export async function getMonthlyStats(year, month) {
   const { data, error } = await supabase.rpc('get_monthly_stats', {
-    p_user_id: getUserId(),
     p_year: year,
     p_month: month,
   });
