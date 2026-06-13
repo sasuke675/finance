@@ -726,6 +726,12 @@ img {
   box-shadow: var(--shadow-glow-debt), var(--shadow-lg);
 }
 
+.fab--sale {
+  background: linear-gradient(135deg, var(--color-transfer), #7c3aed);
+  color: white;
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.25), var(--shadow-lg);
+}
+
 .fab__tooltip {
   position: absolute;
   right: calc(100% + var(--spacing-sm));

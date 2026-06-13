@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, FileText, Banknote, Building2, Smartphone, AlertTriangle } from 'lucide-react';
+import { Plus, FileText, Banknote, Building2, Smartphone, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { useAccounts } from '../hooks/useAccounts';
 import { formatCurrency } from '../lib/api';
 import AccountCard from '../components/AccountCard';
 import Modal from '../components/Modal';
 import TransactionForm from '../components/TransactionForm';
+import SaleTransactionForm from '../components/SaleTransactionForm';
 
 const groupConfig = {
   cash: { label: 'Tunai', icon: Banknote, colorClass: 'text-income' },
@@ -19,7 +20,9 @@ export default function DashboardView() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showEditAccountModal, setShowEditAccountModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSaleModal, setShowSaleModal] = useState(false);
   const [txLoading, setTxLoading] = useState(false);
+  const [saleLoading, setSaleLoading] = useState(false);
 
   // New account form state
   const [newAccountName, setNewAccountName] = useState('');
@@ -53,6 +56,21 @@ export default function DashboardView() {
       alert('Gagal menyimpan transaksi: ' + err.message);
     } finally {
       setTxLoading(false);
+    }
+  };
+
+  const handleSaleSubmit = async (data) => {
+    const { createSalesTransaction } = await import('../lib/api');
+    setSaleLoading(true);
+    try {
+      await createSalesTransaction(data);
+      setShowSaleModal(false);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan transaksi penjualan: ' + err.message);
+    } finally {
+      setSaleLoading(false);
     }
   };
 
@@ -213,6 +231,15 @@ export default function DashboardView() {
       {accounts.length > 0 && (
         <div className="fab-container">
           <button
+            className="fab fab--sale"
+            onClick={() => setShowSaleModal(true)}
+            id="fab-sale"
+            aria-label="Transaksi Penjualan"
+          >
+            <ShoppingBag size={22} />
+            <span className="fab__tooltip">+ Penjualan</span>
+          </button>
+          <button
             className="fab fab--income"
             onClick={() => setShowTxModal(true)}
             id="fab-transaction"
@@ -257,6 +284,20 @@ export default function DashboardView() {
           onSubmit={handleTxSubmit}
           onCancel={() => setShowTxModal(false)}
           loading={txLoading}
+        />
+      </Modal>
+
+      {/* Sales Transaction Modal */}
+      <Modal
+        isOpen={showSaleModal}
+        onClose={() => setShowSaleModal(false)}
+        title="Transaksi Penjualan Baru"
+      >
+        <SaleTransactionForm
+          accounts={accounts}
+          onSubmit={handleSaleSubmit}
+          onCancel={() => setShowSaleModal(false)}
+          loading={saleLoading}
         />
       </Modal>
 

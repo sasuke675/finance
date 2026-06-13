@@ -231,3 +231,69 @@ BEGIN
   ORDER BY day;
 END;
 $$;
+
+-- Function: Create sales transaction (Transfer cost + Income fee)
+CREATE OR REPLACE FUNCTION create_sales_transaction(
+  p_capital_account_id UUID,
+  p_revenue_account_id UUID,
+  p_capital_amount NUMERIC,
+  p_selling_price NUMERIC,
+  p_category TEXT DEFAULT '',
+  p_description TEXT DEFAULT ''
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_transfer_id UUID;
+  v_fee NUMERIC;
+BEGIN
+  -- 1. Create the transfer transaction for the capital
+  INSERT INTO transactions (account_id, type, amount, target_account_id, description, category)
+  VALUES (
+    p_capital_account_id, 
+    'transfer', 
+    p_capital_amount, 
+    p_revenue_account_id, 
+    COALESCE(NULLIF(p_description, ''), p_category) || ' (Modal)', 
+    p_category
+  )
+  RETURNING id INTO v_transfer_id;
+
+  -- Update balances for the transfer
+  UPDATE accounts SET balance = balance - p_capital_amount WHERE id = p_capital_account_id;
+  UPDATE accounts SET balance = balance + p_capital_amount WHERE id = p_revenue_account_id;
+
+  -- 2. Calculate fee (profit)
+  v_fee := p_selling_price - p_capital_amount;
+
+  -- 3. If there is a profit, record it as fee admin income
+  IF v_fee > 0 THEN
+    INSERT INTO transactions (account_id, type, amount, description, category)
+    VALUES (
+      p_revenue_account_id,
+      'in',
+      v_fee,
+      'Fee Admin: ' || COALESCE(NULLIF(p_description, ''), p_category),
+      'Fee/Biaya Admin'
+    );
+
+    UPDATE accounts SET balance = balance + v_fee WHERE id = p_revenue_account_id;
+  ELSIF v_fee < 0 THEN
+    -- If negative (loss), record it as out transaction
+    INSERT INTO transactions (account_id, type, amount, description, category)
+    VALUES (
+      p_capital_account_id,
+      'out',
+      ABS(v_fee),
+      'Rugi Penjualan: ' || COALESCE(NULLIF(p_description, ''), p_category),
+      'Operasional'
+    );
+
+    UPDATE accounts SET balance = balance - ABS(v_fee) WHERE id = p_capital_account_id;
+  END IF;
+
+  RETURN v_transfer_id;
+END;
+$$;

@@ -127,6 +127,20 @@ export async function createTransaction({ accountId, type, amount, targetAccount
   return data;
 }
 
+export async function createSalesTransaction({ capitalAccountId, revenueAccountId, capitalAmount, sellingPrice, category, description }) {
+  const { data, error } = await supabase.rpc('create_sales_transaction', {
+    p_capital_account_id: capitalAccountId,
+    p_revenue_account_id: revenueAccountId,
+    p_capital_amount: capitalAmount,
+    p_selling_price: sellingPrice,
+    p_category: category || '',
+    p_description: description || '',
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 // =====================
 // DEBTS
 // =====================
