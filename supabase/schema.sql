@@ -60,6 +60,7 @@ CREATE TABLE debts (
   total_amount NUMERIC NOT NULL CHECK (total_amount > 0),
   paid_amount NUMERIC NOT NULL DEFAULT 0 CHECK (paid_amount >= 0),
   status debt_status NOT NULL DEFAULT 'unpaid',
+  account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -295,5 +296,95 @@ BEGIN
   END IF;
 
   RETURN v_transfer_id;
+END;
+$$;
+
+-- Function: Create debt with automatic balance update
+CREATE OR REPLACE FUNCTION create_debt_with_balance(
+  p_customer_name TEXT,
+  p_total_amount NUMERIC,
+  p_account_id UUID DEFAULT NULL
+)
+RETURNS debts
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_debt debts;
+  v_transaction_id UUID;
+BEGIN
+  -- Insert the debt record
+  INSERT INTO debts (customer_name, total_amount, account_id)
+  VALUES (p_customer_name, p_total_amount, p_account_id)
+  RETURNING * INTO v_debt;
+
+  -- If an account is selected, decrease the balance and record transaction
+  IF p_account_id IS NOT NULL THEN
+    INSERT INTO transactions (account_id, type, amount, description, category)
+    VALUES (
+      p_account_id,
+      'transfer',
+      p_total_amount,
+      'Pemberian hutang: ' || p_customer_name,
+      'Hutang'
+    )
+    RETURNING id INTO v_transaction_id;
+
+    -- Decrement account balance
+    UPDATE accounts SET balance = balance - p_total_amount WHERE id = p_account_id;
+  END IF;
+
+  RETURN v_debt;
+END;
+$$;
+
+-- Function: Add more debt with automatic balance update
+CREATE OR REPLACE FUNCTION add_debt_amount_with_balance(
+  p_debt_id UUID,
+  p_amount NUMERIC,
+  p_account_id UUID DEFAULT NULL
+)
+RETURNS debts
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_debt debts;
+  v_transaction_id UUID;
+BEGIN
+  -- Get customer name and verify debt exists
+  SELECT * INTO v_debt FROM debts WHERE id = p_debt_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Debt not found';
+  END IF;
+
+  -- Update debt total amount and status
+  UPDATE debts 
+  SET total_amount = total_amount + p_amount,
+      status = CASE 
+        WHEN paid_amount >= total_amount + p_amount THEN 'paid'::debt_status
+        WHEN paid_amount > 0 THEN 'partially_paid'::debt_status
+        ELSE 'unpaid'::debt_status
+      END
+  WHERE id = p_debt_id
+  RETURNING * INTO v_debt;
+
+  -- If an account is selected, decrease the balance and record transaction
+  IF p_account_id IS NOT NULL THEN
+    INSERT INTO transactions (account_id, type, amount, description, category)
+    VALUES (
+      p_account_id,
+      'transfer',
+      p_amount,
+      'Tambahan hutang: ' || v_debt.customer_name,
+      'Hutang'
+    )
+    RETURNING id INTO v_transaction_id;
+
+    -- Decrement account balance
+    UPDATE accounts SET balance = balance - p_amount WHERE id = p_account_id;
+  END IF;
+
+  RETURN v_debt;
 END;
 $$;

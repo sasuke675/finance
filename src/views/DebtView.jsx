@@ -44,6 +44,7 @@ export default function DebtView() {
   // Add debt form state
   const [debtCustomer, setDebtCustomer] = useState('');
   const [debtAmount, setDebtAmount] = useState('');
+  const [debtAccountId, setDebtAccountId] = useState('');
 
   // Edit debt form state
   const [editingDebt, setEditingDebt] = useState(null);
@@ -53,6 +54,7 @@ export default function DebtView() {
   // Add more debt state (for existing customer)
   const [addMoreDebt, setAddMoreDebt] = useState(null);
   const [addMoreAmount, setAddMoreAmount] = useState('');
+  const [addMoreAccountId, setAddMoreAccountId] = useState('');
 
   const handlePay = async (paymentData) => {
     setPayLoading(true);
@@ -75,11 +77,14 @@ export default function DebtView() {
       await createDebt({
         customerName: debtCustomer,
         totalAmount: parseFloat(debtAmount),
+        accountId: debtAccountId || null,
       });
       setShowAddModal(false);
       setDebtCustomer('');
       setDebtAmount('');
+      setDebtAccountId('');
       refresh();
+      refreshAccounts();
     } catch (err) {
       console.error(err);
       alert('Gagal mencatat hutang: ' + err.message);
@@ -123,17 +128,20 @@ export default function DebtView() {
 
   const handleAddMoreDebt = async (e) => {
     e.preventDefault();
-    const { updateDebt } = await import('../lib/api');
+    const { addDebtAmount } = await import('../lib/api');
     setAddMoreLoading(true);
     try {
-      const newTotal = Number(addMoreDebt.total_amount) + parseFloat(addMoreAmount);
-      await updateDebt(addMoreDebt.id, {
-        totalAmount: newTotal,
+      await addDebtAmount({
+        debtId: addMoreDebt.id,
+        amount: parseFloat(addMoreAmount),
+        accountId: addMoreAccountId || null,
       });
       setShowAddMoreModal(false);
       setAddMoreDebt(null);
       setAddMoreAmount('');
+      setAddMoreAccountId('');
       refresh();
+      refreshAccounts();
     } catch (err) {
       console.error(err);
       alert('Gagal menambah hutang: ' + err.message);
@@ -320,6 +328,22 @@ export default function DebtView() {
               required
             />
           </div>
+          <div className="form-group mb-base">
+            <label className="form-label" htmlFor="new-debt-account">Akun/Rekening Awal (Opsional)</label>
+            <select
+              id="new-debt-account"
+              className="form-select"
+              value={debtAccountId}
+              onChange={(e) => setDebtAccountId(e.target.value)}
+            >
+              <option value="">Pilih akun (opsional)</option>
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} ({formatCurrency(acc.balance)})
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="form-actions">
             <button
               type="button"
@@ -431,6 +455,22 @@ export default function DebtView() {
                 required
                 autoFocus
               />
+            </div>
+            <div className="form-group mb-base">
+              <label className="form-label" htmlFor="add-more-account">Akun/Rekening Awal (Opsional)</label>
+              <select
+                id="add-more-account"
+                className="form-select"
+                value={addMoreAccountId}
+                onChange={(e) => setAddMoreAccountId(e.target.value)}
+              >
+                <option value="">Pilih akun (opsional)</option>
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name} ({formatCurrency(acc.balance)})
+                  </option>
+                ))}
+              </select>
             </div>
             {addMoreAmount && parseFloat(addMoreAmount) > 0 && (
               <div className="card card--expense mb-base" style={{ padding: 'var(--spacing-md)', textAlign: 'center' }}>

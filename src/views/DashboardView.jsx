@@ -42,6 +42,7 @@ export default function DashboardView() {
   // Debt form state
   const [debtCustomer, setDebtCustomer] = useState('');
   const [debtAmount, setDebtAmount] = useState('');
+  const [debtAccountId, setDebtAccountId] = useState('');
   const [debtLoading, setDebtLoading] = useState(false);
 
   const handleTxSubmit = async (data) => {
@@ -149,10 +150,13 @@ export default function DashboardView() {
       await createDebt({
         customerName: debtCustomer,
         totalAmount: parseFloat(debtAmount),
+        accountId: debtAccountId || null,
       });
       setShowDebtModal(false);
       setDebtCustomer('');
       setDebtAmount('');
+      setDebtAccountId('');
+      refresh();
     } catch (err) {
       console.error(err);
       alert('Gagal mencatat hutang: ' + err.message);
@@ -333,6 +337,22 @@ export default function DashboardView() {
               min="1"
               required
             />
+          </div>
+          <div className="form-group mb-base">
+            <label className="form-label" htmlFor="debt-account">Akun/Rekening Awal (Opsional)</label>
+            <select
+              id="debt-account"
+              className="form-select"
+              value={debtAccountId}
+              onChange={(e) => setDebtAccountId(e.target.value)}
+            >
+              <option value="">Pilih akun (opsional)</option>
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} ({formatCurrency(acc.balance)})
+                </option>
+              ))}
+            </select>
           </div>
           <div className="form-actions">
             <button
