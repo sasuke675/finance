@@ -42,6 +42,8 @@ export default function DashboardView() {
   // Debt form state
   const [debtCustomer, setDebtCustomer] = useState('');
   const [debtAmount, setDebtAmount] = useState('');
+  const [debtCapital, setDebtCapital] = useState('');
+  const [isCapitalManuallySet, setIsCapitalManuallySet] = useState(false);
   const [debtAccountId, setDebtAccountId] = useState('');
   const [debtLoading, setDebtLoading] = useState(false);
 
@@ -151,10 +153,13 @@ export default function DashboardView() {
         customerName: debtCustomer,
         totalAmount: parseFloat(debtAmount),
         accountId: debtAccountId || null,
+        capitalAmount: debtCapital ? parseFloat(debtCapital) : parseFloat(debtAmount),
       });
       setShowDebtModal(false);
       setDebtCustomer('');
       setDebtAmount('');
+      setDebtCapital('');
+      setIsCapitalManuallySet(false);
       setDebtAccountId('');
       refresh();
     } catch (err) {
@@ -333,8 +338,30 @@ export default function DashboardView() {
               className="form-input"
               placeholder="0"
               value={debtAmount}
-              onChange={(e) => setDebtAmount(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDebtAmount(val);
+                if (!isCapitalManuallySet) {
+                  setDebtCapital(val);
+                }
+              }}
               min="1"
+              required
+            />
+          </div>
+          <div className="form-group mb-base">
+            <label className="form-label" htmlFor="debt-capital">Modal Awal Hutang (Rp)</label>
+            <input
+              id="debt-capital"
+              type="number"
+              className="form-input"
+              placeholder="0"
+              value={debtCapital}
+              onChange={(e) => {
+                setDebtCapital(e.target.value);
+                setIsCapitalManuallySet(true);
+              }}
+              min="0"
               required
             />
           </div>

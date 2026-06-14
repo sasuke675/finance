@@ -160,11 +160,12 @@ export async function fetchDebts(statusFilter) {
   return data || [];
 }
 
-export async function createDebt({ customerName, totalAmount, accountId }) {
+export async function createDebt({ customerName, totalAmount, accountId, capitalAmount }) {
   const { data, error } = await supabase.rpc('create_debt_with_balance', {
     p_customer_name: customerName,
     p_total_amount: totalAmount,
     p_account_id: accountId || null,
+    p_capital_amount: capitalAmount !== undefined ? capitalAmount : null,
   });
 
   if (error) throw error;
@@ -199,11 +200,12 @@ export async function payDebt({ debtId, amount, accountId }) {
   return data;
 }
 
-export async function addDebtAmount({ debtId, amount, accountId }) {
+export async function addDebtAmount({ debtId, amount, accountId, capitalAmount }) {
   const { data, error } = await supabase.rpc('add_debt_amount_with_balance', {
     p_debt_id: debtId,
     p_amount: amount,
     p_account_id: accountId || null,
+    p_capital_amount: capitalAmount !== undefined ? capitalAmount : null,
   });
 
   if (error) throw error;

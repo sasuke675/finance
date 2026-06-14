@@ -44,6 +44,8 @@ export default function DebtView() {
   // Add debt form state
   const [debtCustomer, setDebtCustomer] = useState('');
   const [debtAmount, setDebtAmount] = useState('');
+  const [debtCapital, setDebtCapital] = useState('');
+  const [isCapitalManuallySet, setIsCapitalManuallySet] = useState(false);
   const [debtAccountId, setDebtAccountId] = useState('');
 
   // Edit debt form state
@@ -54,6 +56,8 @@ export default function DebtView() {
   // Add more debt state (for existing customer)
   const [addMoreDebt, setAddMoreDebt] = useState(null);
   const [addMoreAmount, setAddMoreAmount] = useState('');
+  const [addMoreCapital, setAddMoreCapital] = useState('');
+  const [isAddMoreCapitalManuallySet, setIsAddMoreCapitalManuallySet] = useState(false);
   const [addMoreAccountId, setAddMoreAccountId] = useState('');
 
   const handlePay = async (paymentData) => {
@@ -78,10 +82,13 @@ export default function DebtView() {
         customerName: debtCustomer,
         totalAmount: parseFloat(debtAmount),
         accountId: debtAccountId || null,
+        capitalAmount: debtCapital ? parseFloat(debtCapital) : parseFloat(debtAmount),
       });
       setShowAddModal(false);
       setDebtCustomer('');
       setDebtAmount('');
+      setDebtCapital('');
+      setIsCapitalManuallySet(false);
       setDebtAccountId('');
       refresh();
       refreshAccounts();
@@ -123,6 +130,8 @@ export default function DebtView() {
   const handleOpenAddMore = (debt) => {
     setAddMoreDebt(debt);
     setAddMoreAmount('');
+    setAddMoreCapital('');
+    setIsAddMoreCapitalManuallySet(false);
     setShowAddMoreModal(true);
   };
 
@@ -135,10 +144,13 @@ export default function DebtView() {
         debtId: addMoreDebt.id,
         amount: parseFloat(addMoreAmount),
         accountId: addMoreAccountId || null,
+        capitalAmount: addMoreCapital ? parseFloat(addMoreCapital) : parseFloat(addMoreAmount),
       });
       setShowAddMoreModal(false);
       setAddMoreDebt(null);
       setAddMoreAmount('');
+      setAddMoreCapital('');
+      setIsAddMoreCapitalManuallySet(false);
       setAddMoreAccountId('');
       refresh();
       refreshAccounts();
@@ -239,6 +251,11 @@ export default function DebtView() {
                   <span>
                     Dibayar: {formatCurrency(debt.paid_amount)} / {formatCurrency(debt.total_amount)}
                   </span>
+                  {Number(debt.capital_amount) > 0 && (
+                    <span className="text-muted" style={{ fontSize: 'var(--font-size-xs)' }}>
+                      (Modal: {formatCurrency(debt.capital_amount)})
+                    </span>
+                  )}
                   <span>Sisa: {formatCurrency(remaining)}</span>
                 </div>
 
@@ -323,8 +340,30 @@ export default function DebtView() {
               className="form-input"
               placeholder="0"
               value={debtAmount}
-              onChange={(e) => setDebtAmount(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDebtAmount(val);
+                if (!isCapitalManuallySet) {
+                  setDebtCapital(val);
+                }
+              }}
               min="1"
+              required
+            />
+          </div>
+          <div className="form-group mb-base">
+            <label className="form-label" htmlFor="new-debt-capital">Modal Awal Hutang (Rp)</label>
+            <input
+              id="new-debt-capital"
+              type="number"
+              className="form-input"
+              placeholder="0"
+              value={debtCapital}
+              onChange={(e) => {
+                setDebtCapital(e.target.value);
+                setIsCapitalManuallySet(true);
+              }}
+              min="0"
               required
             />
           </div>
@@ -450,10 +489,32 @@ export default function DebtView() {
                 className="form-input"
                 placeholder="0"
                 value={addMoreAmount}
-                onChange={(e) => setAddMoreAmount(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAddMoreAmount(val);
+                  if (!isAddMoreCapitalManuallySet) {
+                    setAddMoreCapital(val);
+                  }
+                }}
                 min="1"
                 required
                 autoFocus
+              />
+            </div>
+            <div className="form-group mb-base">
+              <label className="form-label" htmlFor="add-more-capital">Modal Tambahan (Rp)</label>
+              <input
+                id="add-more-capital"
+                type="number"
+                className="form-input"
+                placeholder="0"
+                value={addMoreCapital}
+                onChange={(e) => {
+                  setAddMoreCapital(e.target.value);
+                  setIsAddMoreCapitalManuallySet(true);
+                }}
+                min="0"
+                required
               />
             </div>
             <div className="form-group mb-base">

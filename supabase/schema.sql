@@ -61,6 +61,7 @@ CREATE TABLE debts (
   paid_amount NUMERIC NOT NULL DEFAULT 0 CHECK (paid_amount >= 0),
   status debt_status NOT NULL DEFAULT 'unpaid',
   account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
+  capital_amount NUMERIC NOT NULL DEFAULT 0 CHECK (capital_amount >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -303,7 +304,8 @@ $$;
 CREATE OR REPLACE FUNCTION create_debt_with_balance(
   p_customer_name TEXT,
   p_total_amount NUMERIC,
-  p_account_id UUID DEFAULT NULL
+  p_account_id UUID DEFAULT NULL,
+  p_capital_amount NUMERIC DEFAULT NULL
 )
 RETURNS debts
 LANGUAGE plpgsql
@@ -312,26 +314,30 @@ AS $$
 DECLARE
   v_debt debts;
   v_transaction_id UUID;
+  v_capital NUMERIC;
 BEGIN
+  -- Default capital to total amount if not specified
+  v_capital := COALESCE(p_capital_amount, p_total_amount);
+
   -- Insert the debt record
-  INSERT INTO debts (customer_name, total_amount, account_id)
-  VALUES (p_customer_name, p_total_amount, p_account_id)
+  INSERT INTO debts (customer_name, total_amount, account_id, capital_amount)
+  VALUES (p_customer_name, p_total_amount, p_account_id, v_capital)
   RETURNING * INTO v_debt;
 
   -- If an account is selected, decrease the balance and record transaction
-  IF p_account_id IS NOT NULL THEN
+  IF p_account_id IS NOT NULL AND v_capital > 0 THEN
     INSERT INTO transactions (account_id, type, amount, description, category)
     VALUES (
       p_account_id,
       'transfer',
-      p_total_amount,
-      'Pemberian hutang: ' || p_customer_name,
+      v_capital,
+      'Pemberian hutang: ' || p_customer_name || ' (Modal)',
       'Hutang'
     )
     RETURNING id INTO v_transaction_id;
 
     -- Decrement account balance
-    UPDATE accounts SET balance = balance - p_total_amount WHERE id = p_account_id;
+    UPDATE accounts SET balance = balance - v_capital WHERE id = p_account_id;
   END IF;
 
   RETURN v_debt;
@@ -342,7 +348,8 @@ $$;
 CREATE OR REPLACE FUNCTION add_debt_amount_with_balance(
   p_debt_id UUID,
   p_amount NUMERIC,
-  p_account_id UUID DEFAULT NULL
+  p_account_id UUID DEFAULT NULL,
+  p_capital_amount NUMERIC DEFAULT NULL
 )
 RETURNS debts
 LANGUAGE plpgsql
@@ -351,16 +358,21 @@ AS $$
 DECLARE
   v_debt debts;
   v_transaction_id UUID;
+  v_capital NUMERIC;
 BEGIN
-  -- Get customer name and verify debt exists
+  -- Default capital to the added amount if not specified
+  v_capital := COALESCE(p_capital_amount, p_amount);
+
+  -- Get current debt info
   SELECT * INTO v_debt FROM debts WHERE id = p_debt_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Debt not found';
   END IF;
 
-  -- Update debt total amount and status
+  -- Update debt total amount, capital amount, and status
   UPDATE debts 
   SET total_amount = total_amount + p_amount,
+      capital_amount = capital_amount + v_capital,
       status = CASE 
         WHEN paid_amount >= total_amount + p_amount THEN 'paid'::debt_status
         WHEN paid_amount > 0 THEN 'partially_paid'::debt_status
@@ -370,19 +382,19 @@ BEGIN
   RETURNING * INTO v_debt;
 
   -- If an account is selected, decrease the balance and record transaction
-  IF p_account_id IS NOT NULL THEN
+  IF p_account_id IS NOT NULL AND v_capital > 0 THEN
     INSERT INTO transactions (account_id, type, amount, description, category)
     VALUES (
       p_account_id,
       'transfer',
-      p_amount,
-      'Tambahan hutang: ' || v_debt.customer_name,
+      v_capital,
+      'Tambahan hutang: ' || v_debt.customer_name || ' (Modal)',
       'Hutang'
     )
     RETURNING id INTO v_transaction_id;
 
     -- Decrement account balance
-    UPDATE accounts SET balance = balance - p_amount WHERE id = p_account_id;
+    UPDATE accounts SET balance = balance - v_capital WHERE id = p_account_id;
   END IF;
 
   RETURN v_debt;
